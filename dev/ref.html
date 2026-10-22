@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>참고 영상 프레임 시트</title>
+<style>body{margin:0;background:#222;color:#ddd;font:13px sans-serif}#info{padding:6px 10px}canvas{display:block}</style></head>
+<body><div id="info">loading…</div><canvas id="c"></canvas>
+<script>
+// 사용: ref.html?v=run&t0=0&t1=1.2&n=12&cols=6&crop=x,y,w,h&scale=1  (crop: 영상 픽셀 좌표)
+// 영상 프레임을 격자(contact sheet)로 그려 dev/out/<v>_<t0>.png 로 저장한다. 움직임 분석용.
+const q = new URLSearchParams(location.search);
+const v = q.get('v') || 'run', t0 = +(q.get('t0') || 0), n = +(q.get('n') || 12), cols = +(q.get('cols') || 6);
+const sc = +(q.get('scale') || 1);
+const vid = document.createElement('video'); vid.muted = true; vid.preload = 'auto'; vid.src = `ref/${v}.mp4`;
+const info = document.getElementById('info'), cv = document.getElementById('c'), c = cv.getContext('2d');
+const seek = t => new Promise(r => { vid.onseeked = () => r(); vid.currentTime = t; });
+vid.onloadedmetadata = async () => {
+  const t1 = +(q.get('t1') || vid.duration);
+  const crop = (q.get('crop') || `0,0,${vid.videoWidth},${vid.videoHeight}`).split(',').map(Number);
+  const [cx, cy, cw, ch] = crop, w = Math.round(cw * sc), h = Math.round(ch * sc), rows = Math.ceil(n / cols);
+  cv.width = w * cols; cv.height = (h + 16) * rows; c.fillStyle = '#222'; c.fillRect(0, 0, cv.width, cv.height);
+  info.textContent = `${v}: ${vid.videoWidth}x${vid.videoHeight}, ${vid.duration.toFixed(2)}s, 시트 ${n}장 (${t0}~${t1}s)`;
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? t0 + (t1 - t0) * i / (n - 1) : t0;
+    await seek(Math.min(t, vid.duration - .01));
+    const x = (i % cols) * w, y = Math.floor(i / cols) * (h + 16);
+    c.drawImage(vid, cx, cy, cw, ch, x, y + 16, w, h);
+    c.fillStyle = '#ffd'; c.font = '12px sans-serif'; c.fillText(t.toFixed(3) + 's', x + 4, y + 12);
+  }
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  await fetch(`/__save?name=${encodeURIComponent(`${v}_${t0}.png`)}`, { method: 'POST', body: blob });
+  info.textContent += ' → 저장됨 dev/out/' + `${v}_${t0}.png`;
+  document.title = 'done';
+};
+// 추적 모드: ref.html?v=run&mode=trace&t0=0&t1=2&fps=30&crop=...  → 프레임마다 갈색 외곽선 픽셀의 범위를 재서 dev/out/<v>_trace.json 저장
+if (q.get('mode') === 'trace') {
+  vid.onloadedmetadata = async () => {
+    const t1 = +(q.get('t1') || 2), fps = +(q.get('fps') || 30), xmax = +(q.get('xmax') || 1e9);
+    const [cx, cy, cw, ch] = (q.get('crop') || '0,0,720,1280').split(',').map(Number);
+    cv.width = cw; cv.height = ch; const rows = [];
+    for (let t = t0; t < t1; t += 1 / fps) {
+      await seek(t); c.drawImage(vid, cx, cy, cw, ch, 0, 0, cw, ch);
+      const d = c.getImageData(0, 0, cw, ch).data; let top = 1e9, L = 1e9, R = -1, bot = -1, sx = 0, sy = 0, n = 0, bodyL = 1e9, headR = -1;
+      for (let y = 0; y < ch; y++) for (let x = 0; x < Math.min(cw, xmax); x++) {
+        const i = (y * cw + x) * 4, r = d[i], g = d[i + 1], b = d[i + 2];
+        if (r < 150 && r > g + 15 && g < 110 && b < 100) { // 갈색 외곽선
+          n++; sx += x; sy += y; if (y < top) top = y; if (y > bot) bot = y; if (x < L) L = x; if (x > R) R = x;
+          if (y > 200 && x < bodyL) bodyL = x; if (y < 150 && x > headR) headR = x;
+        }
+      }
+      rows.push({ t: +t.toFixed(3), top, bot, L, R, cx: +(sx / n).toFixed(1), cy: +(sy / n).toFixed(1), n, bodyL, headR });
+    }
+    await fetch(`/__save?name=${encodeURIComponent(v + '_trace.json')}`, { method: 'POST', body: JSON.stringify(rows) });
+    info.textContent = `trace ${rows.length} frames saved`; document.title = 'done';
+  };
+}
+vid.onerror =() => { info.textContent = '영상 로드 실패 (코덱 미지원?)'; document.title = 'error'; };
+</script></body></html>

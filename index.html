@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>코니 &amp; 브라운 러브 런</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage"><canvas id="world"></canvas><canvas id="game"></canvas></div>
+<div id="rotate"><div>📱↻<br>가로 모드로 돌려주세요!</div></div>
+<div id="boot"><canvas id="bootc"></canvas><span id="bootfb">💕 불러오는 중… 💕</span></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// 수정할 때마다 브라우저 캐시 때문에 옛 코드가 실행되지 않도록 버전 쿼리를 붙여 로드
+for (const f of ['core', 'chars', 'anim', 'sprites', 'sprites_data', 'engine', 'audio', 'voice_data', 'world', 'world3d', 'data', 'run', 'mini', 'screens', 'main'])
+  document.write(`<script src="js/${f}.js?v=${Date.now()}"><\/script>`);
+</script>
+</body>
+</html>

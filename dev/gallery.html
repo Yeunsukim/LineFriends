@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>캐릭터 갤러리</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#fff4f8}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script>for (const f of ['core', 'chars', 'anim', 'sprites', 'sprites_data']) document.write(`<script src="../js/${f}.js?v=${Date.now()}"><\/script>`);</script>
+<script>
+LF.sprites.base = '../'; // 스프라이트 이미지 경로
+const cv = document.getElementById('c'), c = cv.getContext('2d');
+const anims = (new URLSearchParams(location.search).get('a') || 'idle,walk,run,jump,fall,slide,hurt,cheer,shy,kiss,sad,wave,throw,give,lift,sit,hold,dance,surprise,eat,pout').split(',');
+const big = new URLSearchParams(location.search).get('big');
+const actors = [];
+anims.forEach(a => { for (const k of ['brown', 'cony']) { const A = new LF.Actor(k); A.play(a, a === 'lift' ? { k: .5 } : {}); actors.push({ A, a }); } });
+function size() { const d = devicePixelRatio || 1; cv.width = innerWidth * d; cv.height = innerHeight * d; cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px'; c.setTransform(d, 0, 0, d, 0, 0); }
+addEventListener('resize', size); size();
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; LF.t += dt;
+  c.clearRect(0, 0, innerWidth, innerHeight);
+  const cols = big ? 2 : 8, cw = innerWidth / cols, ch = big ? innerHeight : 190, s = big ? innerHeight * .6 : 120;
+  actors.forEach((o, i) => {
+    o.A.update(dt); if (o.a === 'throw' && o.A.at > 1) o.A.at = 0; if (o.a === 'lift') o.A.opt.k = (Math.sin(LF.t * 3) + 1) / 2;
+    const x = (i % cols) * cw + cw / 2, y = Math.floor(i / cols) * ch + ch - 30;
+    LF.shadow(c, x, y, s * .3);
+    o.A.draw(c, x, y, s);
+    G.text(c, o.a, x, y + 16, { size: 14, color: '#c06' });
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></body></html>

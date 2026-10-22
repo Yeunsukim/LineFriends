@@ -1,0 +1,9 @@
+node_modules/
+.claude/settings.local.json
+*.log
+Thumbs.db
+
+# 참고용 원본 영상 (저작권, 대용량)
+동영상/
+*.mp4
+dev/out/

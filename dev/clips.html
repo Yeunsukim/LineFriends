@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>클립 미리보기</title>
+<style>html,body{margin:0;background:#fff;font:13px sans-serif}canvas{display:block}#bar{padding:6px 10px;background:#fff4f8}</style></head>
+<body><div id="bar">…</div><canvas id="c"></canvas>
+<script>for (const f of ['core', 'chars', 'anim']) document.write(`<script src="../js/${f}.js?v=${Date.now()}"><\/script>`);</script>
+<script>
+// 참고 영상이 없는 동작을 확인하는 미리보기: 클립마다 프레임을 한 줄로 늘어놓고 dev/out/clips.png 로 저장.
+//  ?rows=JUMP,FALL,CHEER,LAND&char=cony&n=12&step=2   (step: 프레임 간격(@30fps), LAND는 착지 충격 시험)
+const q = new URLSearchParams(location.search);
+const rows = (q.get('rows') || 'JUMP,FALL,CHEER').split(','), kind = q.get('char') || 'cony', n = +(q.get('n') || 12), step = +(q.get('step') || 2);
+const S = +(q.get('s') || 120), PW = S * 1.05, PH = S * 1.45;
+const cv = document.getElementById('c'), c = cv.getContext('2d');
+cv.width = PW * n; cv.height = (PH + 14) * rows.length; c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+const A = new LF.Actor(kind);
+rows.forEach((name, r) => {
+  const oy = r * (PH + 14);
+  c.fillStyle = '#c06'; c.font = '12px sans-serif'; c.fillText(`${name} (${kind}, ${step}프레임 간격)`, 4, oy + 11);
+  for (let i = 0; i < n; i++) {
+    const x = i * PW + PW / 2, y = oy + 14 + PH - 10;
+    c.strokeStyle = '#eee'; c.strokeRect(i * PW, oy + 14, PW, PH);
+    LF.shadow(c, x, y, S * .25);
+    if (name === 'LAND') { // 달리다 착지 충격을 받는 모습
+      if (i === 0) { A.play('run'); A.ph = .1; for (let k = 0; k < 8; k++) A.update(1 / 60); A.land(1); }
+      else for (let k = 0; k < step * 2; k++) A.update(1 / 60);
+      A.draw(c, x, y, S);
+    } else if (name === 'LIFT') { // 운동: k(힘쓰는 정도)를 0→1로
+      A.imp = 0; LF.t = i * step / 30; const T = ANIM.lift(i * step / 30, { k: i / Math.max(1, n - 1) }); A.p = Object.assign({}, POSE0, T); A.eyes = T.eyes; A.mouth = T.mouth; A.draw(c, x, y, S);
+    } else {
+      const clip = LF[name]; A.p = LF.sampleClip(clip, i * step / 30); A.eyes = A.p.eyes || 'dot'; A.mouth = A.p.mouth || 'neutral';
+      LF.t = i * step / 30; A.imp = 0; A.draw(c, x, y - 0, S);
+    }
+    c.fillStyle = '#999'; c.font = '10px sans-serif'; c.fillText(String(i * step), i * PW + 3, oy + 24);
+  }
+});
+cv.toBlob(async b => { await fetch(`/__save?name=${encodeURIComponent('clips_' + kind + '.png')}`, { method: 'POST', body: b }); document.getElementById('bar').textContent = '저장됨: dev/out/clips_' + kind + '.png'; document.title = 'done'; });
+</script></body></html>

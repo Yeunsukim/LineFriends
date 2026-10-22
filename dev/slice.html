@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>스프라이트 자르기</title>
+<style>
+  :root{--g:#2f6b4f;--bg:#f6f4ef;--card:#fff;--line:#e2ddd2}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);font:14px/1.45 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;color:#2b2b2b}
+  #app{display:grid;grid-template-columns:330px 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+  aside,section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  h1{font-size:18px;margin:0 0 4px} h3{margin:0 0 8px;font-size:14px;color:var(--g)}
+  .hint{color:#777;font-size:12px;margin:2px 0 8px}
+  label{display:block;margin:8px 0 2px;font-weight:600;font-size:13px}
+  select,input[type=number],input[type=text]{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px} .row4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .chk{display:flex;gap:8px;align-items:center;font-weight:400;margin:6px 0} .chk input{margin:0}
+  button{padding:9px 12px;border:0;border-radius:10px;background:var(--g);color:#fff;font:inherit;font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+  button.sub{background:#fff;color:var(--g);border:1px solid var(--g)} button.warn{background:#fff;color:#b3402a;border:1px solid #d9a79d}
+  #msg{margin-top:10px;padding:8px 10px;border-radius:8px;background:#eef7f1;font-size:13px;min-height:20px;white-space:pre-wrap}
+  #msg.err{background:#fdeceb;color:#a3281c}
+  canvas{display:block;max-width:100%}
+  #src{border:1px solid var(--line);background:#fff}
+  .checker{background:conic-gradient(#e9e9e9 25%,#fff 0 50%,#e9e9e9 0 75%,#fff 0) 0 0/16px 16px}
+  #play{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+  #strip{overflow-x:auto;margin-top:10px;border:1px solid var(--line)}
+  pre{margin:8px 0 0;font-size:12px;white-space:pre-wrap;color:#555}
+  main{display:grid;gap:16px;align-content:start}
+</style></head>
+<body>
+<div id="app">
+  <aside>
+    <h1>스프라이트 자르기</h1>
+    <div class="hint">힉스필드 등으로 만든 <b>달리기 영상(권장) 또는 시트</b>를 프레임으로 잘라 게임에 넣는 도구예요. 위에서 아래로 차례로 설정하면 오른쪽에서 바로 움직임이 보여요.</div>
+
+    <label>① 시트 파일</label>
+    <select id="file"><option value="">(불러오는 중…)</option></select>
+    <div class="hint">또는 내 컴퓨터에서 직접 고르기</div>
+    <input type="file" id="upload" accept="image/*,video/*">
+    <div id="vbox" style="display:none;margin-top:8px;padding:8px;border:1px dashed var(--g);border-radius:10px">
+      <div class="hint" style="margin-top:0"><b>영상이에요.</b> 한 번 달리는 구간만 골라 프레임을 뽑아요. (배경이 흰색인 영상이어야 잘 지워져요)</div>
+      <div class="row"><div><label>시작(초)</label><input type="number" id="vt0" value="0" step="0.05" min="0"></div><div><label>끝(초)</label><input type="number" id="vt1" value="1" step="0.05" min="0.1"></div></div>
+      <label>뽑을 프레임 수</label><input type="number" id="vn" value="8" min="2" max="24">
+      <button id="vgo" class="sub">프레임 다시 뽑기</button>
+      <div class="hint">보통 발이 같은 자세로 돌아오는 한 주기(약 0.4~0.6초)를 고르면 자연스럽게 반복돼요.</div>
+    </div>
+
+    <div class="row">
+      <div><label>② 캐릭터</label><select id="kind"><option value="cony">코니</option><option value="brown">브라운</option></select></div>
+      <div><label>동작 이름</label><input type="text" id="anim" value="run" list="anims"><datalist id="anims"><option>run</option><option>jump</option><option>fall</option><option>walk</option><option>cheer</option></datalist></div>
+    </div>
+
+    <label>③ 격자 (시트를 몇 칸으로 나눌까요)</label>
+    <div class="row"><div><input type="number" id="cols" value="4" min="1" max="12"><div class="hint">가로 칸 수</div></div><div><input type="number" id="rows" value="2" min="1" max="12"><div class="hint">세로 칸 수</div></div></div>
+    <label>프레임 순서 <span class="hint">(비우면 왼쪽 위부터 차례로, 예: 0,1,2,3,4,5,6,7)</span></label>
+    <input type="text" id="order" placeholder="비워두면 전부">
+
+    <label>④ 가장자리 잘라내기 (원본 px)</label>
+    <div class="row4"><input type="number" id="mt" value="0" title="위"><input type="number" id="mb" value="0" title="아래"><input type="number" id="ml" value="0" title="왼쪽"><input type="number" id="mr" value="0" title="오른쪽"></div>
+    <div class="hint">위 · 아래 · 왼쪽 · 오른쪽 순서</div>
+    <label class="chk"><input type="checkbox" id="wm" checked> 오른쪽 아래 워터마크(HIGGSFIELD AI) 가리기</label>
+
+    <label>⑤ 배경 지우기</label>
+    <input type="range" id="thr" min="200" max="254" value="236" style="width:100%">
+    <div class="hint">밝기 <span id="thrv">236</span> 이상이면 배경으로 봐요. 캐릭터 안이 지워지면 올리고, 배경이 남으면 내리세요.</div>
+    <label class="chk"><input type="checkbox" id="gray" checked> 회색 그림자도 지우기</label>
+
+    <label>⑥ 정렬</label>
+    <select id="align"><option value="cell">시트 그대로 (뛰어오름·바운스 유지) — 추천</option><option value="feet">발을 항상 바닥에 맞춤 (그림 위치가 들쭉날쭉할 때)</option></select>
+    <div class="row">
+      <div><label>한 주기(초)</label><input type="number" id="cycle" value="0.47" step="0.01" min="0.1"></div>
+      <div><label>크기 보정</label><input type="number" id="size" value="1" step="0.05" min="0.3"></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="flip"> 그림이 왼쪽을 보고 있으면 좌우 반전</label>
+
+    <button id="save">게임에 저장하기</button>
+    <button id="del" class="warn">이 동작의 그림 빼기 (벡터로 되돌림)</button>
+    <div id="msg">시트를 고르면 시작돼요.</div>
+  </aside>
+
+  <main>
+    <section><h3>원본 시트 (빨간 선 = 자르는 격자, 번호 = 프레임 순서)</h3><canvas id="src"></canvas></section>
+    <section>
+      <h3>결과 미리보기</h3>
+      <div id="play">
+        <div><div class="hint">큰 화면</div><canvas id="animc" class="checker"></canvas></div>
+        <div><div class="hint">게임 크기 (실제로 보이는 크기)</div><canvas id="game" class="checker"></canvas></div>
+      </div>
+      <div id="strip"><canvas id="stripc" class="checker"></canvas></div>
+      <pre id="info"></pre>
+    </section>
+  </main>
+</div>
+
+<script>
+// 흐름: 시트 불러오기 → 워터마크/여백 정리 → 격자로 자르기 → 가장자리에서부터 흰 배경을 채워 지우기(캐릭터 안쪽 흰색은 보존)
+//       → 프레임을 같은 크기 칸에 정렬해 가로 한 줄로 이어 붙이기 → assets/sprites/<캐릭터>_<동작>.png + js/sprites_data.js 기록
+const $ = id => document.getElementById(id);
+const CH = { cony: 1.19, brown: 1.04 }; // sprites.js 와 같은 캐릭터 키(리그 단위)
+let srcImg = null, built = null, timer = 0, animT = 0;
+const say = (t, err) => { const m = $('msg'); m.textContent = t; m.className = err ? 'err' : ''; };
+
+// ---- 파일 목록 ----
+async function loadList() {
+  const sel = $('file'); sel.innerHTML = '<option value="">(시트를 고르세요)</option>';
+  for (const dir of ['동영상', 'dev/out']) {
+    try { const l = await (await fetch('/__list?dir=' + encodeURIComponent(dir))).json(); for (const n of l) sel.insertAdjacentHTML('beforeend', `<option value="/${dir}/${encodeURIComponent(n)}">${dir}/${n}</option>`); } catch (e) { }
+  }
+}
+let vid = null;
+function loadMedia(url, name) {
+  if (/\.(mp4|webm|mov)$/i.test(name || url)) return loadVideo(url);
+  $('vbox').style.display = 'none'; vid = null; loadImage(url);
+}
+function loadVideo(url) {
+  say('영상을 불러오는 중…'); $('vbox').style.display = 'block';
+  const v = document.createElement('video'); v.muted = true; v.preload = 'auto'; v.src = url;
+  v.onloadedmetadata = () => { vid = v; $('vt0').value = 0; $('vt1').value = Math.min(1, +v.duration.toFixed(2)); say(`영상: ${v.videoWidth}×${v.videoHeight}, ${v.duration.toFixed(2)}초 — 구간을 정하고 '프레임 다시 뽑기'를 누르세요.`); extractFrames(); };
+  v.onerror = () => say('영상을 열지 못했어요. (브라우저가 지원하는 mp4/webm인지 확인)', true);
+}
+async function extractFrames() {
+  if (!vid) return;
+  const n = Math.max(2, +$('vn').value | 0), t0 = +$('vt0').value, t1 = Math.min(+$('vt1').value, vid.duration);
+  if (!(t1 > t0)) return say('끝 시간이 시작보다 커야 해요.', true);
+  const k = Math.min(1, 720 / vid.videoHeight), cw = Math.round(vid.videoWidth * k), ch = Math.round(vid.videoHeight * k);
+  const sh = document.createElement('canvas'); sh.width = cw * n; sh.height = ch; const c = sh.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, sh.width, sh.height);
+  for (let i = 0; i < n; i++) { // 끝 시각은 제외: 첫 프레임으로 이어져 한 주기가 매끄럽게 반복됨
+    await new Promise(r => { vid.onseeked = r; vid.currentTime = Math.min(vid.duration - .01, t0 + (t1 - t0) * i / n); });
+    c.drawImage(vid, i * cw, 0, cw, ch);
+  }
+  $('cols').value = n; $('rows').value = 1; $('order').value = ''; $('wm').checked = false; $('cycle').value = +(t1 - t0).toFixed(2);
+  const blob = await new Promise(r => sh.toBlob(r, 'image/png')); loadImage(URL.createObjectURL(blob));
+}
+$('vgo').onclick = extractFrames;
+function loadImage(url) {
+  say('불러오는 중…');
+  const im = new Image(); im.onload = () => { srcImg = im; say(`불러옴: ${im.naturalWidth}×${im.naturalHeight}px`); rebuild(); }; im.onerror = () => say('이미지를 불러오지 못했어요.', true); im.src = url;
+}
+$('file').onchange = e => { if (e.target.value) loadMedia(e.target.value, decodeURIComponent(e.target.value)); };
+$('upload').onchange = e => { const f = e.target.files[0]; if (f) loadMedia(URL.createObjectURL(f), f.name); };
+
+// ---- 배경 지우기: 가장자리와 이어진 '배경색' 픽셀만 지운다 ----
+function removeBg(img, w, h, T, gray) {
+  const d = img.data, N = w * h, seen = new Uint8Array(N), stack = new Int32Array(N); let sp = 0;
+  const isBg = p => { const i = p * 4, r = d[i], g = d[i + 1], b = d[i + 2], mn = Math.min(r, g, b), mx = Math.max(r, g, b);
+    return d[i + 3] < 10 || mn >= T || (gray && mx - mn <= 12 && mn >= 150 && mx <= 252); };
+  const push = p => { if (!seen[p] && isBg(p)) { seen[p] = 1; stack[sp++] = p; } };
+  const minRun = Math.max(20, Math.round(Math.min(w, h) * .12));
+  const seedLine = (n, at) => { let run = 0; for (let k = 0; k <= n; k++) { if (k < n && isBg(at(k))) run++; else { if (run >= minRun) for (let j = k - run; j < k; j++) push(at(j)); run = 0; } } };
+  seedLine(w, x => x); seedLine(w, x => (h - 1) * w + x); seedLine(h, y => y * w); seedLine(h, y => y * w + w - 1);
+  while (sp) { const p = stack[--sp], x = p % w, y = (p / w) | 0; if (x > 0) push(p - 1); if (x < w - 1) push(p + 1); if (y > 0) push(p - w); if (y < h - 1) push(p + w); }
+  // 지운 곳과 맞닿은 1픽셀 테두리: 밝은 안티앨리어싱 픽셀을 반투명하게 (흰 테두리 방지)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = y * w + x; if (seen[p]) continue;
+    let edge = false; for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < w && ny < h && seen[ny * w + nx]) { edge = true; break; } }
+    if (!edge) continue;
+    const i = p * 4, m = Math.min(d[i], d[i + 1], d[i + 2]); if (m > 120) d[i + 3] = Math.round(Math.max(0, Math.min(1, (252 - m) / (252 - 120))) * d[i + 3]);
+  }
+  for (let p = 0; p < N; p++) if (seen[p]) d[p * 4 + 3] = 0;
+  return img;
+}
+const bboxOf = (img, w, h) => { const d = img.data; let x0 = w, y0 = h, x1 = -1, y1 = -1; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 }; };
+const median = a => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+
+// ---- 전체 처리 ----
+function build() {
+  const W = srcImg.naturalWidth, H = srcImg.naturalHeight;
+  const cols = +$('cols').value, rows = +$('rows').value, T = +$('thr').value, gray = $('gray').checked;
+  const L = +$('ml').value, R = +$('mr').value, Tp = +$('mt').value, B = +$('mb').value;
+  const full = document.createElement('canvas'); full.width = W; full.height = H; const fc = full.getContext('2d', { willReadFrequently: true });
+  fc.fillStyle = '#fff'; fc.fillRect(0, 0, W, H); fc.drawImage(srcImg, 0, 0);
+  if ($('wm').checked) { fc.fillStyle = '#fff'; fc.fillRect(W * .64, H * .925, W * .36, H * .075); }
+  const rx = L, ry = Tp, rw = W - L - R, rh = H - Tp - B, cw = rw / cols, ch = rh / rows;
+  const order = $('order').value.trim() ? $('order').value.split(/[ ,]+/).map(Number).filter(n => n >= 0 && n < cols * rows) : [...Array(cols * rows).keys()];
+  const frames = [];
+  for (const idx of order) {
+    const cx = Math.round(rx + (idx % cols) * cw), cy = Math.round(ry + Math.floor(idx / cols) * ch), w = Math.round(cw), h = Math.round(ch);
+    const img = removeBg(fc.getImageData(cx, cy, w, h), w, h, T, gray), bb = bboxOf(img, w, h);
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').putImageData(img, 0, 0);
+    frames.push({ idx, cv, w, h, bb });
+  }
+  const touch = frames.filter(f => f.bb && (f.bb.x0 <= 1 || f.bb.y0 <= 1 || f.bb.x1 >= f.w - 1 || f.bb.y1 >= f.h - 1)).map(f => f.idx);
+  const ok = frames.filter(f => f.bb); if (!ok.length) throw new Error('캐릭터를 찾지 못했어요. 배경 밝기 값을 올리거나 격자를 확인해 주세요.');
+  const pad = 6, align = $('align').value;
+  let U, outW, outH, fx, fy;
+  const heights = ok.map(f => f.bb.y1 - f.bb.y0), ref = median(heights);
+  if (align === 'cell') {
+    U = { x0: Math.min(...ok.map(f => f.bb.x0)), y0: Math.min(...ok.map(f => f.bb.y0)), x1: Math.max(...ok.map(f => f.bb.x1)), y1: Math.max(...ok.map(f => f.bb.y1)) };
+    outW = U.x1 - U.x0 + pad * 2; outH = U.y1 - U.y0 + pad * 2;
+    fx = ok.reduce((s, f) => s + (f.bb.x0 + f.bb.x1) / 2, 0) / ok.length - U.x0 + pad; fy = U.y1 - U.y0 + pad;
+  } else {
+    outW = Math.max(...ok.map(f => f.bb.x1 - f.bb.x0)) + pad * 2; outH = Math.max(...heights) + pad * 2; fx = outW / 2; fy = outH - pad;
+  }
+  const maxH = 640, sc = Math.min(1, maxH / outH), flip = $('flip').checked;
+  const cw2 = Math.round(outW * sc), chh = Math.round(outH * sc), n = frames.length;
+  const strip = document.createElement('canvas'); strip.width = cw2 * n; strip.height = chh; const sc2 = strip.getContext('2d'); sc2.imageSmoothingQuality = 'high';
+  frames.forEach((f, i) => {
+    sc2.save(); sc2.translate(i * cw2, 0); if (flip) { sc2.translate(cw2, 0); sc2.scale(-1, 1); }
+    if (f.bb) {
+      let dx, dy;
+      if (align === 'cell') { dx = -U.x0 + pad; dy = -U.y0 + pad; } else { dx = fx - (f.bb.x0 + f.bb.x1) / 2; dy = fy - f.bb.y1; }
+      sc2.drawImage(f.cv, dx * sc, dy * sc, f.w * sc, f.h * sc);
+    }
+    sc2.restore();
+  });
+  const meta = { n, w: cw2, h: chh, fx: Math.round((flip ? outW - fx : fx) * sc), fy: Math.round(fy * sc), ref: Math.round(ref * sc), cycle: +$('cycle').value, size: +$('size').value };
+  return { strip, meta, frames, info: `프레임 ${n}장 · 한 칸 ${cw2}×${chh}px · 캐릭터 키 약 ${meta.ref}px\n프레임 높이: ${heights.join(', ')} (들쭉날쭉하면 '발을 항상 바닥에 맞춤'을 써보세요)${ok.length < n ? '\n⚠ 비어 있는 프레임 ' + (n - ok.length) + '장' : ''}${touch.length ? '\n⚠ 칸 가장자리에 닿아 잘렸을 수 있는 프레임: ' + touch.join(', ') + ' → 시트를 다시 만들 때 캐릭터 둘레에 여백을 넉넉히 두세요' : ''}` };
+}
+function rebuild() {
+  clearTimeout(timer); timer = setTimeout(() => {
+    if (!srcImg) return;
+    drawSrc();
+    try { built = build(); const s = built.strip; $('stripc').width = s.width; $('stripc').height = s.height; $('stripc').getContext('2d').drawImage(s, 0, 0); $('stripc').style.height = Math.min(110, s.height) + 'px'; $('stripc').style.width = 'auto'; $('info').textContent = built.info; say('미리보기 갱신됨. 마음에 들면 "게임에 저장하기"를 누르세요.'); }
+    catch (e) { built = null; say(e.message, true); }
+  }, 120);
+}
+function drawSrc() {
+  const cv = $('src'), W = srcImg.naturalWidth, H = srcImg.naturalHeight, k = Math.min(1, 760 / W); cv.width = W * k; cv.height = H * k;
+  const c = cv.getContext('2d'); c.drawImage(srcImg, 0, 0, cv.width, cv.height);
+  const cols = +$('cols').value, rows = +$('rows').value, L = +$('ml').value, R = +$('mr').value, Tp = +$('mt').value, B = +$('mb').value;
+  const rw = W - L - R, rh = H - Tp - B;
+  c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(0, 0, W * k, Tp * k); c.fillRect(0, (H - B) * k, W * k, B * k); c.fillRect(0, 0, L * k, H * k); c.fillRect((W - R) * k, 0, R * k, H * k);
+  if ($('wm').checked) { c.fillStyle = 'rgba(255,255,255,.85)'; c.fillRect(W * .64 * k, H * .925 * k, W * .36 * k, H * .075 * k); c.strokeStyle = '#999'; c.strokeRect(W * .64 * k, H * .925 * k, W * .36 * k, H * .075 * k); }
+  c.strokeStyle = '#e02'; c.lineWidth = 1.5; c.fillStyle = '#e02'; c.font = 'bold 14px sans-serif';
+  for (let i = 0; i <= cols; i++) { const x = (L + rw * i / cols) * k; c.beginPath(); c.moveTo(x, Tp * k); c.lineTo(x, (H - B) * k); c.stroke(); }
+  for (let j = 0; j <= rows; j++) { const y = (Tp + rh * j / rows) * k; c.beginPath(); c.moveTo(L * k, y); c.lineTo((W - R) * k, y); c.stroke(); }
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) c.fillText(String(j * cols + i), (L + rw * i / cols) * k + 5, (Tp + rh * j / rows) * k + 16);
+}
+for (const id of ['kind', 'anim', 'cols', 'rows', 'order', 'mt', 'mb', 'ml', 'mr', 'wm', 'gray', 'align', 'cycle', 'size', 'flip']) $(id).addEventListener('input', rebuild);
+$('thr').addEventListener('input', () => { $('thrv').textContent = $('thr').value; rebuild(); });
+
+// ---- 미리보기 재생 ----
+let last = performance.now();
+(function loop(now) {
+  const dt = (now - last) / 1000; last = now; animT += dt;
+  if (built) {
+    const { strip, meta } = built, cyc = +$('cycle').value || .47, i = Math.floor(((animT % cyc) / cyc) * meta.n);
+    const a = $('animc'), g = $('game'), A = Math.min(1, 330 / meta.h); a.width = meta.w * A; a.height = meta.h * A;
+    a.getContext('2d').drawImage(strip, i * meta.w, 0, meta.w, meta.h, 0, 0, a.width, a.height);
+    const kk = 128 * CH[$('kind').value] * (+$('size').value || 1) / meta.ref; // 게임에서 보이는 크기 (캐릭터 s=128)
+    g.width = Math.ceil(meta.w * kk); g.height = Math.ceil(meta.h * kk); g.getContext('2d').drawImage(strip, i * meta.w, 0, meta.w, meta.h, 0, 0, g.width, g.height);
+  }
+  requestAnimationFrame(loop);
+})(last);
+
+// ---- 저장 ----
+async function readData() {
+  const t = await (await fetch('../js/sprites_data.js?' + Date.now())).text();
+  return JSON.parse(t.slice(t.indexOf('LF.SPRITES = ') + 13, t.lastIndexOf(';')));
+}
+async function writeData(obj) {
+  const body = "'use strict';\n// 자동 생성 파일 — dev/slice.html 이 기록합니다. 직접 고치지 마세요. (비어 있으면 모든 캐릭터가 벡터로 그려집니다)\nLF.SPRITES = " + JSON.stringify(obj, null, 1) + ";\n";
+  const r = await fetch('/__save?dir=js&name=sprites_data.js', { method: 'POST', body }); if (!r.ok) throw new Error('목록 저장 실패 ' + r.status);
+}
+$('save').onclick = async () => {
+  if (!built) return say('먼저 시트를 불러와 미리보기가 보이게 해주세요.', true);
+  const key = $('kind').value + '_' + $('anim').value.trim();
+  try {
+    const blob = await new Promise(r => built.strip.toBlob(r, 'image/png'));
+    const r = await fetch(`/__save?dir=assets/sprites&name=${encodeURIComponent(key + '.png')}`, { method: 'POST', body: blob }); if (!r.ok) throw new Error('PNG 저장 실패 ' + r.status);
+    const data = await readData(); data[key] = Object.assign({ src: `assets/sprites/${key}.png`, v: Date.now() }, built.meta); await writeData(data);
+    say(`저장 완료: ${key}\n게임을 새로고침하면 적용돼요. (${built.meta.n}프레임, 한 주기 ${built.meta.cycle}초)`);
+  } catch (e) { say(e.message, true); }
+};
+$('del').onclick = async () => {
+  const key = $('kind').value + '_' + $('anim').value.trim();
+  try { const data = await readData(); if (!data[key]) return say(key + ' 은(는) 등록돼 있지 않아요.'); delete data[key]; await writeData(data); say(key + ' 을(를) 뺐어요. 게임은 다시 벡터 캐릭터로 그려요.'); } catch (e) { say(e.message, true); }
+};
+
+loadList();
+</script></body></html>

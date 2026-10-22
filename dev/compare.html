@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>동작 비교 (원본 영상 vs 리그)</title>
+<style>html,body{margin:0;background:#fff;font:13px sans-serif}canvas{display:block}#bar{padding:6px 10px;background:#fff4f8}</style></head>
+<body><div id="bar">…</div><canvas id="c"></canvas>
+<script>for (const f of ['core', 'chars', 'anim']) document.write(`<script src="../js/${f}.js?v=${Date.now()}"><\/script>`);</script>
+<script>
+// 원본 영상의 키프레임(위)과 같은 시점의 리그 포즈(아래)를 나란히 보여준다.
+//  ?v=run&char=cony&t0=0.5&crop=180,560,330,360&gx=130&gy=300&s=310&live=1
+//  - 기본: 6개 키 구간을 한 줄로 비교 (영상 / 리그)
+//  - live=1: 영상과 리그를 함께 반복 재생
+const q = new URLSearchParams(location.search);
+const v = q.get('v') || 'run', kind = q.get('char') || 'cony', t0 = +(q.get('t0') || .5), clipName = q.get('clip') || 'RUN';
+const crop = (q.get('crop') || '180,560,330,360').split(',').map(Number), [cx, cy, cw, ch] = crop;
+const gx = +(q.get('gx') || 130), gy = +(q.get('gy') || 300), S = +(q.get('s') || 310), PS = +(q.get('ps') || .75);
+let ov = {}; const ovs = [].concat(JSON.parse(q.get('ov') || '{}')); // 모든 키 포즈에 덮어쓸 값. 배열이면 리그 줄을 여러 개 그림 (예: ov=[{"side":0},{"side":.6}])
+const clip = LF[clipName], keyT = (q.get('kt') || '0,.067,.133,.2,.267,.333').split(',').map(Number); // 영상에서 각 키의 시각(t0 기준 오프셋)
+const cv = document.getElementById('c'), c = cv.getContext('2d'), bar = document.getElementById('bar');
+const vid = document.createElement('video'); vid.muted = true; vid.src = `ref/${v}.mp4`;
+const A = new LF.Actor(kind);
+const seek = t => new Promise(r => { vid.onseeked = () => r(); vid.currentTime = t; });
+function drawRig(x, y, s, pose) { A.p = Object.assign({}, pose, ov); A.eyes = pose.eyes || 'dot'; A.mouth = pose.mouth || 'neutral'; LF.shadow(c, x, y, s * .22); A.draw(c, x, y, s); }
+function keyTimes() { const out = []; let f = 0; for (const k of clip.keys) { out.push((f + k.f * .5) / clip.fps); f += k.f; } return out; } // 각 키 구간 중간
+vid.onloadedmetadata = async () => {
+  const pw = cw * PS, ph = ch * PS, n = clip.keys.length;
+  if (q.get('live')) return live(pw, ph);
+  if (q.get('dense')) return dense();
+  cv.width = pw * n; cv.height = ph * (1 + ovs.length) + 20 * ovs.length; c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+  const kt = keyTimes();
+  for (let i = 0; i < n; i++) {
+    await seek(t0 + (keyT[i] != null ? keyT[i] : i * .0667));
+    c.drawImage(vid, cx, cy, cw, ch, i * pw, 0, pw, ph);
+    c.strokeStyle = '#eee'; c.strokeRect(i * pw, 0, pw, ph);
+    ovs.forEach((o, r) => { ov = o; const oy = (ph + 20) * (r + 1);
+      c.save(); c.beginPath(); c.rect(i * pw, oy, pw, ph); c.clip();
+      LF.t = i; drawRig(i * pw + gx * PS, oy + gy * PS, S * PS, LF.sampleClip(clip, kt[i]));
+      c.restore(); c.strokeRect(i * pw, oy, pw, ph);
+      c.fillStyle = '#c06'; c.font = '12px sans-serif'; c.fillText(`key ${i} ${JSON.stringify(o)}`, i * pw + 4, oy - 6); });
+  }
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  await fetch(`/__save?name=${encodeURIComponent('compare_' + v + '.png')}`, { method: 'POST', body: blob });
+  bar.textContent = `비교 저장됨: dev/out/compare_${v}.png (위: 원본 영상, 아래: 리그)`; document.title = 'done';
+};
+// 전체 프레임 비교: 영상(위)과 리그(아래)를 30fps 프레임마다 (한 주기 14프레임을 2줄로)
+async function dense() {
+  const total = clip.keys.reduce((s, k) => s + k.f, 0), cols = 7, PS2 = +(q.get('ps') || .6), pw = cw * PS2, ph = ch * PS2, blocks = Math.ceil(total / cols);
+  cv.width = pw * cols; cv.height = (ph * 2 + 16) * blocks; c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+  ov = ovs[0];
+  for (let i = 0; i < total; i++) {
+    const bx = (i % cols) * pw, by = Math.floor(i / cols) * (ph * 2 + 16);
+    await seek(t0 + i / 30); c.drawImage(vid, cx, cy, cw, ch, bx, by, pw, ph);
+    c.save(); c.beginPath(); c.rect(bx, by + ph + 16, pw, ph); c.clip();
+    LF.t = i; drawRig(bx + gx * PS2, by + ph + 16 + gy * PS2, S * PS2, LF.sampleClip(clip, (i + .5) / 30));
+    c.restore(); c.strokeStyle = '#ddd'; c.strokeRect(bx, by, pw, ph); c.strokeRect(bx, by + ph + 16, pw, ph);
+    c.fillStyle = '#c06'; c.font = '11px sans-serif'; c.fillText('frame ' + i + '  video ' + (t0 + i / 30).toFixed(3), bx + 4, by + ph + 12);
+  }
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  await fetch('/__save?name=' + encodeURIComponent('dense_' + v + '.png'), { method: 'POST', body: blob });
+  bar.textContent = '전체 프레임 비교 저장됨: dev/out/dense_' + v + '.png'; document.title = 'done';
+}
+function live(pw, ph) {
+  cv.width = pw * 2; cv.height = ph; vid.loop = false; vid.currentTime = t0; vid.play();
+  const len = LF.clipLen(clip); let last = performance.now(), ct = 0;
+  bar.textContent = '실시간: 왼쪽 원본 영상 / 오른쪽 리그 (같은 주기로 반복)';
+  (function f(now) {
+    const dt = (now - last) / 1000; last = now; ct += dt; LF.t += dt;
+    if (vid.currentTime > t0 + len * 3 || vid.ended) { vid.currentTime = t0; ct = 0; }
+    c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+    c.drawImage(vid, cx, cy, cw, ch, 0, 0, pw, ph);
+    drawRig(pw + gx * PS, gy * PS, S * PS, LF.sampleClip(clip, Math.max(0, vid.currentTime - t0)));
+    requestAnimationFrame(f);
+  })(last);
+}
+</script></body></html>
