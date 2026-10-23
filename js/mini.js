@@ -2,6 +2,8 @@
 // 미니게임 6종: 뽀뽀 · 운동(2레인 리듬) · 요리(기억력+오븐) · 하트 받기 · 낚시 · 대화
 LF.grade = s => s >= .9 ? ['완벽해요!', 3] : s >= .65 ? ['좋아요!', 2] : s >= .4 ? ['아쉬워요', 1] : ['다시 해볼까?', 0];
 
+const MINI_BACK = { x: 70, y: 70, r: 40 }; // 인트로 화면의 뒤로가기 버튼
+
 LF.makeMini = def => {
   const S = {
     enter(p) {
@@ -35,7 +37,7 @@ LF.makeMini = def => {
       LF.fx.draw(c); LF.fx.drawTexts(c);
       c.restore();
       if (this.state === 'intro') {
-        c.fillStyle = 'rgba(70,20,50,.35)'; c.fillRect(0, 0, W, H);
+        c.fillStyle = 'rgba(70,20,50,.35)'; c.fillRect(-LF.ox, 0, LF.VW, H);
         LF.panel(c, W / 2 - 420, 70, 840, 560, { r: 46 });
         G.text(c, def.title, W / 2, 140, { size: 60, color: '#2f6b4f', stroke: '#fff', sw: 12 });
         G.text(c, `STAGE ${this.st.id} · ${this.st.name}`, W / 2, 196, { size: 24, color: '#8a9a8f' });
@@ -45,10 +47,13 @@ LF.makeMini = def => {
         if (this.state === 'intro') { this.A.play('wave'); this.B.play('idle'); }
         this.startBtn.draw(c);
         G.text(c, LF.touch ? '화면을 터치해 시작' : '스페이스 / 클릭으로 시작', W / 2, 600, { size: 20, color: '#8a9a8f' });
+        // 뒤로가기 (터치에는 Esc가 없으니 화면에 버튼을 둔다)
+        c.fillStyle = 'rgba(255,255,255,.92)'; c.beginPath(); c.arc(MINI_BACK.x, MINI_BACK.y, MINI_BACK.r, 0, TAU); c.fill(); c.lineWidth = 4; c.strokeStyle = '#ffb3d1'; c.stroke();
+        c.strokeStyle = '#ff6fa5'; c.lineWidth = 8; c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(MINI_BACK.x + 8, MINI_BACK.y - 16); c.lineTo(MINI_BACK.x - 8, MINI_BACK.y); c.lineTo(MINI_BACK.x + 8, MINI_BACK.y + 16); c.stroke();
       }
       if (this.state === 'done' && this.doneT > 1.1) {
         const e = ease.back(clamp((this.doneT - 1.1) / .5, 0, 1)), [msg, st] = LF.grade(this.score);
-        c.fillStyle = `rgba(70,20,50,${.4 * Math.min(1, e)})`; c.fillRect(0, 0, W, H);
+        c.fillStyle = `rgba(70,20,50,${.4 * Math.min(1, e)})`; c.fillRect(-LF.ox, 0, LF.VW, H);
         c.save(); c.translate(W / 2, H / 2 - 20); c.scale(e, e);
         LF.panel(c, -360, -250, 720, 470, { r: 46 });
         G.text(c, msg, 0, -185, { size: 62, color: '#2f6b4f', stroke: '#fff', sw: 12 });
@@ -62,7 +67,7 @@ LF.makeMini = def => {
       }
     },
     pointerdown(x, y, id) {
-      if (this.state === 'intro') { this.begin(); return; }
+      if (this.state === 'intro') { if (Math.hypot(x - MINI_BACK.x, y - MINI_BACK.y) < MINI_BACK.r + 16) { LF.sfx('click'); LF.go('map'); } else this.begin(); return; }
       if (this.state === 'play') { def.press && def.press.call(this, x, y, id); return; }
       if (this.state === 'done' && this.doneT > 1.4) LF.ui.down(x, y, this.score < .65 ? [this.nextBtn, this.retryBtn] : [this.nextBtn]);
     },
@@ -139,7 +144,7 @@ LF.scenes.mg_kiss = LF.makeMini({
     c.restore();
     if (kt >= kissAt) {
       // 가장자리가 분홍으로 어두워지는 비네트 (눈이 입맞춤으로 모이게)
-      const g = c.createRadialGradient(fx, fy, 160, fx, fy, 760); g.addColorStop(0, 'rgba(255,170,200,0)'); g.addColorStop(1, `rgba(150,40,90,${.5 * zk})`); c.fillStyle = g; c.fillRect(0, 0, W, LF.H);
+      const g = c.createRadialGradient(fx, fy, 160, fx, fy, 760); g.addColorStop(0, 'rgba(255,170,200,0)'); g.addColorStop(1, `rgba(150,40,90,${.5 * zk})`); c.fillStyle = g; c.fillRect(-LF.ox, 0, LF.VW, LF.H);
       // 머리 위에 큰 하트가 톡 튀어나와 두근두근
       const pk = ease.back(clamp((kt - kissAt) / .45, 0, 1)), hs = 120 * pk * (1 + .06 * Math.sin(t * 9));
       G.glow(c, W / 2, fy - 150, hs * 1.2, 'rgba(255,130,170,.45)'); G.drawHeart(c, W / 2, fy - 150 - Math.sin(t * 3) * 6, hs, '#ff3d6e', '#fff', 7);

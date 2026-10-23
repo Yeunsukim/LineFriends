@@ -400,7 +400,8 @@ LF.scenes.run = {
   drawHUD(c) {
     const W = LF.W, p = this.pl, t = this.t;
     if (this.state === 'intro') return;
-    // 왼쪽: 초상화 + 목숨
+    // 왼쪽: 초상화 + 목숨 (노치 쪽 안전영역만큼 안쪽으로)
+    c.save(); c.translate(LF.inL, 0);
     LF.panel(c, 18, 16, 120 + this.maxLives * 50, 96, { r: 48 });
     LF.portrait(c, this.A, 66, 64, 38);
     for (let i = 0; i < this.maxLives; i++) {
@@ -408,6 +409,7 @@ LF.scenes.run = {
       c.save(); c.translate(x, 64); c.scale(beat, beat);
       G.drawHeart(c, 0, 0, 42, on ? '#ff4d84' : '#eadde6', on ? '#fff' : '#d8c8d4', 4, on); c.restore();
     }
+    c.restore();
     // 가운데: 점수 + 콤보
     const sx = W / 2;
     c.fillStyle = 'rgba(255,255,255,.88)'; G.rr(c, sx - 150, 14, 300, 70, 35); c.fill(); c.lineWidth = 4; c.strokeStyle = '#ffb3d1'; c.stroke();
@@ -420,7 +422,7 @@ LF.scenes.run = {
       G.text(c, `${this.combo} COMBO  x${this.mult()}`, 0, 1, { size: 24, color: '#fff' }); c.restore();
     }
     // 오른쪽: 하트 게이지 (액체가 차오르는 큰 하트)
-    const hx = W - 170, hy = 66, hs = 100, pct = clamp(this.got / this.totalV, 0, 1);
+    const hx = W - LF.inR - 170, hy = 66, hs = 100, pct = clamp(this.got / this.totalV, 0, 1);
     c.save();
     G.heart(c, hx, hy, hs); c.fillStyle = '#fff'; c.fill();
     c.save(); G.heart(c, hx, hy, hs); c.clip();
@@ -439,8 +441,9 @@ LF.scenes.run = {
     G.text(c, `목표 ${Math.round(this.quota * 100)}%`, hx - 100, hy + 44, { size: 18, color: '#7a5cff', stroke: '#fff', sw: 5, align: 'right' });
     if (pct >= this.quota) G.text(c, 'OK!', hx + 64, hy - 34, { size: 22, color: '#ffb52e', stroke: '#fff', sw: 5 });
     // 일시정지
-    c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(W - 52, 60, 32, 0, TAU); c.fill(); c.lineWidth = 4; c.strokeStyle = '#ffb3d1'; c.stroke();
-    c.fillStyle = '#ff6fa5'; G.rr(c, W - 64, 46, 9, 28, 3); c.fill(); G.rr(c, W - 49, 46, 9, 28, 3); c.fill();
+    const PB = TOUCH_UI.pause, pr = LF.touch ? PB.r : 32;
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.beginPath(); c.arc(PB.x, PB.y, pr, 0, TAU); c.fill(); c.lineWidth = 4; c.strokeStyle = '#ffb3d1'; c.stroke();
+    c.fillStyle = '#ff6fa5'; G.rr(c, PB.x - pr * .4, PB.y - pr * .45, pr * .28, pr * .9, 3); c.fill(); G.rr(c, PB.x + pr * .12, PB.y - pr * .45, pr * .28, pr * .9, 3); c.fill();
     // 하단: 진행 트랙
     const tx0 = 300, tx1 = W - 300, ty = LF.H - 26, prog = clamp(p.x / this.goalX, 0, 1);
     c.fillStyle = 'rgba(255,255,255,.7)'; G.rr(c, tx0, ty - 6, tx1 - tx0, 12, 6); c.fill();
@@ -451,9 +454,10 @@ LF.scenes.run = {
     G.drawHeart(c, tx1 + 56, ty - 22, 20, '#ff4d84', '#fff', 3);
     // 터치 버튼
     if (LF.touch) {
-      touchBtn(c, 110, LF.H - 120, 70, 'slide', this.downHeld);
-      touchBtn(c, W - 120, LF.H - 120, 82, 'jump', p.jumpHeld);
-      touchBtn(c, W - 290, LF.H - 90, 56, 'throw', this.cool > 0, this.cool / .42);
+      const T = TOUCH_UI;
+      touchBtn(c, T.slide.x, T.slide.y, T.slide.r, 'slide', this.downHeld);
+      touchBtn(c, T.jump.x, T.jump.y, T.jump.r, 'jump', p.jumpHeld);
+      touchBtn(c, T.throw.x, T.throw.y, T.throw.r, 'throw', this.cool > 0, this.cool / .42);
     } else if (this.time < 7 && this.state === 'run') {
       const a = clamp((7 - this.time) / 1.5, 0, 1);
       G.text(c, '스페이스·↑ 점프(2단)   ↓ 슬라이드(공중에선 급강하)   X 하트 던지기', W / 2, LF.H - 62, { size: 22, color: '#fff', stroke: 'rgba(200,60,120,.85)', sw: 7, alpha: a });
@@ -505,12 +509,14 @@ LF.scenes.run = {
   pointerdown(x, y, id) {
     if (this.paused) { LF.ui.down(x, y, this.pauseBtns); return; }
     if (this.state === 'fail') { if (this.st0 > .4) LF.ui.down(x, y, this.failBtns); return; }
-    if (Math.hypot(x - (LF.W - 52), y - 60) < 40) { this.paused = true; LF.sfx('click'); return; }
+    const T = TOUCH_UI;
+    if (Math.hypot(x - T.pause.x, y - T.pause.y) < (LF.touch ? T.pause.hit : 40)) { this.paused = true; LF.sfx('click'); return; }
     if (this.state === 'deliver') return;
     let act;
     if (LF.touch) {
-      if (Math.hypot(x - (LF.W - 290), y - (LF.H - 90)) < 70) act = 'throw';
-      else if (x < LF.W * .4 && y > LF.H * .45) act = 'slide';
+      // 버튼 주변을 넉넉히 인식하고, 나머지는 왼쪽 아래 = 슬라이드 / 그 외 어디든 = 점프
+      if (Math.hypot(x - T.throw.x, y - T.throw.y) < T.throw.r + 28) act = 'throw';
+      else if (Math.hypot(x - T.slide.x, y - T.slide.y) < T.slide.r + 34 || (x < LF.W * .3 && y > LF.H * .55)) act = 'slide';
       else act = 'jump';
     } else act = 'jump';
     this.ptrs.set(id, act); this.input(act, true);
@@ -664,8 +670,16 @@ function dropSkin(c, k, x, bottom, w, h, falling, t) {
   }
   c.restore();
 }
+// 터치 버튼 배치 (그리기와 판정이 같은 값을 쓴다). 논리 좌표 1280x720 기준 — 폰에서 축소돼도 엄지로 누르기 쉬운 크기
+// 화면을 덜 가리도록 작게, 가장자리에 붙여서 둔다 (폭은 기기에 따라 달라지므로 getter로 현재 LF.W를 따른다)
+const TOUCH_UI = {
+  get slide() { return { x: LF.inL + 92, y: LF.H - 88, r: 58 }; },
+  get jump() { return { x: LF.W - LF.inR - 92, y: LF.H - 90, r: 70 }; },
+  get throw() { return { x: LF.W - LF.inR - 222, y: LF.H - 74, r: 50 }; },
+  get pause() { return { x: LF.W - LF.inR - 54, y: 54, r: 34, hit: 56 }; },
+};
 function touchBtn(c, x, y, r, kind, active, cd = 0) {
-  c.save(); c.globalAlpha = .9; c.translate(x, y); const s = active ? .92 : 1; c.scale(s, s);
+  c.save(); c.globalAlpha = active ? .85 : .66; c.translate(x, y); const s = active ? .92 : 1; c.scale(s, s); // 반투명: 뒤의 화면이 비쳐 보이게
   c.fillStyle = kind === 'jump' ? '#ff6fa5' : kind === 'slide' ? '#3f8a66' : '#ffb52e';
   c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill(); c.lineWidth = 6; c.strokeStyle = '#fff'; c.stroke();
   c.fillStyle = '#fff';

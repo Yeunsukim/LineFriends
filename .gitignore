@@ -7,3 +7,19 @@ Thumbs.db
 동영상/
 *.mp4
 dev/out/
+
+# 앱 빌드 산출물
+www/
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/src/main/assets/public/
+android/capacitor-cordova-android-plugins/
+apk/
+
+# 앱 서명 키와 비밀번호 — 절대 올리지 않는다
+keystore/
+*.jks
+*.keystore
+keystore.properties

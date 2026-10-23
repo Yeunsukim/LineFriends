@@ -1,0 +1,18 @@
+{
+  "name": "코니 & 브라운 러브 런",
+  "short_name": "러브 런",
+  "description": "코니와 브라운이 달려가 만나는 러브 런 (팬 메이드 게임)",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#ffd9ea",
+  "theme_color": "#ffd9ea",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -25,7 +25,7 @@ LF.flow = {
 // 공통 배경: 핑크 하늘 + 떠다니는 하트 + 반짝이
 function dreamyBG(c, t, cols = ['#ffd3e8', '#ffeef6', '#e8dcff']) {
   const W = LF.W, H = LF.H;
-  c.fillStyle = G.lin(c, 0, 0, 0, H, cols); c.fillRect(0, 0, W, H);
+  c.fillStyle = G.lin(c, 0, 0, 0, H, cols); c.fillRect(-LF.ox, 0, LF.VW, H);
   c.save(); c.globalAlpha = .16; c.translate(W / 2, 320);
   for (let i = 0; i < 14; i++) { c.rotate(TAU / 14); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, 0); c.lineTo(1200, -60); c.lineTo(1200, 60); c.fill(); }
   c.restore();
@@ -41,7 +41,7 @@ function parkBG(c, t, o = {}) {
   if (LF.scene3d('menu_' + key, { theme: key, len: 9000, x0: -5000, seed: 3, houses: [0, 30], noFront: true, props: [
     { t: 'dog', x: -2.9, z: -3.0, ry: .5 }, { t: 'controller', x: -5.2, z: -2.7 }, { t: 'bench', x: 3.4, z: -3.3 }, { t: 'planter', x: 1.7, z: -2.9 },
     { t: 'balloon', x: 5.2, z: -3.5 }, { t: 'mailbox', x: -1.6, z: -4.7 }, { t: 'picnic', x: 7.6, z: -2.9 }, { t: 'sign', x: 10.5, z: -3.4 }, { t: 'bench', x: -8.5, z: -3.2 }, { t: 'dog', x: 12.8, z: -2.9, ry: -.6 }] }) && LF.view3d((o.x || 0) + Math.sin(t * .07) * 300 - 640, o.gy || 520)) {
-    if (o.veil) { c.fillStyle = `rgba(255,250,244,${o.veil})`; c.fillRect(0, 0, LF.W, LF.H); }
+    if (o.veil) { c.fillStyle = `rgba(255,250,244,${o.veil})`; c.fillRect(-LF.ox, 0, LF.VW, LF.H); }
     return true;
   }
   dreamyBG(c, t, o.cols); return false;
@@ -245,7 +245,7 @@ LF.scenes.map = {
   draw(c) {
     const W = LF.W, H = LF.H, t = this.t, S = LF.save.data;
     if (!parkBG(c, t, { gy: 700, veil: .12, x: -1500 })) {
-      c.fillStyle = G.lin(c, 0, 0, 0, H, ['#a9dcff', '#e3f4ff', '#fff0f7']); c.fillRect(0, 0, W, H);
+      c.fillStyle = G.lin(c, 0, 0, 0, H, ['#a9dcff', '#e3f4ff', '#fff0f7']); c.fillRect(-LF.ox, 0, LF.VW, H);
     }
     const n = this.nodes;
     // 길
@@ -281,7 +281,7 @@ LF.scenes.map = {
   },
   drawPop(c) {
     const W = LF.W, H = LF.H, s = this.sel.s, rec = LF.save.data.stages[s.id] || {};
-    c.fillStyle = 'rgba(70,20,50,.4)'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(70,20,50,.4)'; c.fillRect(-LF.ox, 0, LF.VW, H);
     LF.panel(c, W / 2 - 360, 130, 720, 470, { r: 46 });
     G.text(c, `STAGE ${s.id}`, W / 2, 180, { size: 28, color: '#e089b0' });
     G.text(c, s.name, W / 2, 236, { size: 62, color: '#2f6b4f', stroke: '#fff', sw: 10 });

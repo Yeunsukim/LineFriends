@@ -5,7 +5,7 @@ const port = Number(process.argv[2]) || 8123;
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml',
-  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.woff2': 'font/woff2',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.webmanifest': 'application/manifest+json',
 };
 http.createServer((req, res) => {
   // 개발 도구용: POST /__save?name=파일명 → dev/out/ 에 저장 (프레임 시트 등 분석 결과 확인용)

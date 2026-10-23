@@ -7,6 +7,10 @@ const LF = {
   ptr: { x: -999, y: -999, down: false },
   keys: new Set(),
   touch: ('ontouchstart' in window) || navigator.maxTouchPoints > 0,
+  // 폰·태블릿(주 입력이 터치) — 3D 경량화, 전체화면 등 모바일 전용 처리의 기준. 마우스가 주 입력인 PC는 false.
+  mobile: !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent),
+  // 노치·제스처바 등 안전영역(px). main.js resize()에서 갱신
+  safe: { t: 0, r: 0, b: 0, l: 0 },
 };
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a) * t;

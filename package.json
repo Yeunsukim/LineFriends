@@ -1,0 +1,22 @@
+{
+  "name": "linefriends-loverun",
+  "version": "1.0.0",
+  "private": true,
+  "description": "코니 & 브라운 러브 런 — 웹 + Android 앱(Capacitor)",
+  "scripts": {
+    "dev": "node dev/serve.js 8123",
+    "build:www": "node scripts/build-www.js",
+    "sync": "node scripts/build-www.js && npx cap sync android",
+    "android": "node scripts/build-www.js && npx cap sync android && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3"
+  }
+}

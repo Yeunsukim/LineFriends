@@ -100,7 +100,7 @@ LF._enter = (name, params) => {
   const s = LF.scenes[name]; if (!s) { console.error('no scene', name); return; }
   if (LF.cur && LF.cur.exit) LF.cur.exit();
   LF.fx.clear(); LF.ui.btns = [];
-  LF.cur = s; LF.curName = name; s.enter && s.enter(params || {});
+  LF.cur = s; LF.curName = name; LF.syncW && LF.syncW(); s.enter && s.enter(params || {});
 };
 LF.updateTrans = dt => {
   const tr = LF.trans; if (tr.phase === 'none') return;

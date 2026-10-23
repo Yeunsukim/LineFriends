@@ -11,6 +11,25 @@ LINE FRIENDS 브라운과 코니가 나오는 팬메이드 HTML5 러닝 게임�
 ## 실행
 - `index.html` 더블클릭
 - 또는 이 폴더에서 `python -m http.server 8123` 실행 후 http://localhost:8123 접속
+- Three.js·폰트는 `vendor/`, `fonts/`에 들어 있어 인터넷 없이도 실행됩니다.
+
+## 웹으로 배포 (PWA — 홈 화면에 추가)
+- `npm run build:www` 를 실행하면 `www/` 폴더가 만들어집니다. 이 폴더 **전체**를 HTTPS 호스팅(GitHub Pages, Netlify 등)에 올리면 됩니다. (서비스 워커는 HTTPS에서만 동작)
+- iPhone: Safari에서 열고 **공유 → 홈 화면에 추가**. Android: Chrome 메뉴 → **앱 설치**(또는 홈 화면에 추가).
+- 한 번 열어 두면 파일이 모두 폰에 저장돼 인터넷 없이도 실행됩니다. 게임을 고쳐서 다시 `build:www` 후 올리면 캐시 이름(파일 해시)이 바뀌어 다음 실행 때 자동으로 새 버전으로 교체됩니다.
+- iPhone은 가로 고정을 코드로 걸 수 없어서 사용자가 직접 가로로 돌려야 합니다(세로일 때 안내 문구가 뜹니다).
+- 개발 중(localhost)에는 서비스 워커를 등록하지 않아 수정이 바로 보입니다. PWA 동작을 시험하려면 `www/`를 띄우고 주소 뒤에 `?pwa`를 붙이세요.
+- 아이콘은 `resources/`의 원본에서 `node scripts/make-pwa-icons.js`로 다시 만들 수 있습니다(`icons/`).
+
+## 모바일 (Android 앱)
+- 가로 화면 전용. 폰 브라우저에서 열면 전체화면 + 가로 고정을 시도하고, 모바일에서는 3D 배경을 가볍게 그리다가 계속 느리면 자동으로 2D 배경으로 바꿉니다. (PC는 화질 그대로)
+- 앱은 [Capacitor](https://capacitorjs.com)로 감쌉니다. `npm install` 후:
+  - `npm run sync` : `www/` 로 웹 파일을 복사하고 `android/` 에 반영
+  - `npm run android` : 위 작업 + Android Studio 열기 → ▶ 로 실행하거나 Build > Build APK
+  - 필요한 것: Android Studio (SDK 36 + JDK 21). JDK 25는 이 Gradle(8.14)이 지원하지 않아 빌드가 실패합니다. iOS는 Mac에서 `npx cap add ios`.
+  - 릴리스(공유용) APK: `cd android && gradlew.bat assembleRelease` → `app/build/outputs/apk/release/app-release.apk`. 서명 키(`loverun-release.jks`)와 `keystore.properties`는 저장소 밖 `%USERPROFILE%\android-dev\keystore\`에 두고(기본 위치)(환경변수 `LOVERUN_KEYSTORE_PROPS`로 위치 변경 가능), **잃어버리면 같은 앱으로 업데이트할 수 없으니 따로 백업**하세요. git에는 올리지 않습니다.
+  - 명령줄 빌드: `android/local.properties`에 `sdk.dir=C:/경로/sdk` (슬래시로!) 를 적고 `cd android && gradlew.bat assembleDebug` → `android/app/build/outputs/apk/debug/app-debug.apk`
+- 아이콘/스플래시 원본은 `resources/`, 다시 만들려면 `npx capacitor-assets generate --android --assetPath resources`.
 
 ## 설정
 - **누가 누구에게?** 코니→브라운 또는 브라운→코니 중에서 고릅니다. 대사와 엔딩도 선택에 맞게 바뀝니다.

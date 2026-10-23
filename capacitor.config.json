@@ -1,0 +1,12 @@
+{
+  "appId": "com.linefriends.loverun",
+  "appName": "코니 & 브라운 러브 런",
+  "webDir": "www",
+  "backgroundColor": "#ffd9ea",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "StatusBar": { "overlaysWebView": true }
+  }
+}

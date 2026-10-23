@@ -23,19 +23,22 @@ LF.W3 = (() => {
   const col = c => new THREE.Color(c).convertSRGBToLinear(); // sRGB 출력에 맞춰 색이 바래지 않게
   const lam = (c, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color: col(c), roughness: .92, metalness: 0 }, o));
 
+  // 품질 단계 (모바일 전용): 0=기본 → 1=해상도 낮춤 → 2=그림자 끔 → 3=3D 끄고 2D 배경. PC는 항상 0.
+  let quality = 0, dprCap = LF.mobile ? 1.5 : 2;
   function init(canvas) {
     if (!window.THREE) return false;
     try {
-      R = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+      R = new THREE.WebGLRenderer({ canvas, antialias: !LF.mobile, alpha: false, powerPreference: LF.mobile ? 'default' : 'high-performance' });
     } catch (e) { return false; }
     R.outputEncoding = THREE.sRGBEncoding; R.toneMapping = THREE.NoToneMapping;
-    R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
+    R.shadowMap.enabled = true; R.shadowMap.type = LF.mobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+    if (LF.mobile) R.shadowMap.autoUpdate = false; // 모바일: frame()에서 필요할 때만 needsUpdate
     scene = new THREE.Scene();
     cam = new THREE.PerspectiveCamera(FOV, LF.W / LF.H, .1, 400);
     cam.position.set(0, 2.4, D);
     hemi = new THREE.HemisphereLight(0xffffff, 0x88aa66, .9); scene.add(hemi);
     sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048); const sc = sun.shadow.camera; sc.left = -16; sc.right = 16; sc.top = 12; sc.bottom = -8; sc.near = 1; sc.far = 80; sun.shadow.bias = -.0008; sun.shadow.normalBias = .02;
+    sun.shadow.mapSize.set(LF.mobile ? 1024 : 2048, LF.mobile ? 1024 : 2048); const sc = sun.shadow.camera; sc.left = -16; sc.right = 16; sc.top = 12; sc.bottom = -8; sc.near = 1; sc.far = 80; sun.shadow.bias = -.0008; sun.shadow.normalBias = .02;
     scene.add(sun); scene.add(sun.target);
     // 하늘: 세로 그라데이션 돔
     sky = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), new THREE.ShaderMaterial({
@@ -49,7 +52,20 @@ LF.W3 = (() => {
     M = new THREE.Matrix4(); Q = new THREE.Quaternion(); V = new THREE.Vector3(); S = new THREE.Vector3(); E = new THREE.Euler();
     ok = true; return true;
   }
-  function resize(w, h, dpr) { if (!ok) return; R.setPixelRatio(Math.min(dpr, 2)); R.setSize(w, h, false); }
+  function resize(w, h, dpr) { // w가 16:9보다 넓으면 카메라 가로 시야를 넓혀 배경이 양옆으로 더 보이게 한다 (세로 시야·게임 평면 크기는 그대로)
+    if (!ok) return; R.setPixelRatio(Math.min(dpr, dprCap)); R.setSize(w, h, false);
+    cam.aspect = w / h; cam.updateProjectionMatrix();
+  }
+  // 한 단계 낮춘다 (main.js가 모바일에서 프레임이 계속 느릴 때 호출). 호출 뒤 resize()를 다시 불러야 해상도가 반영된다.
+  // 3D 배경 자체는 끄지 않는다 (이 게임의 얼굴이라 2D로 바뀌면 PC와 전혀 다른 느낌이 됨). 해상도 → 그림자 순으로만 낮춘다.
+  function lowerQuality() {
+    if (!ok || quality >= 2) return;
+    quality++;
+    if (quality === 1) dprCap = 1;
+    else { R.shadowMap.enabled = false; sun.castShadow = false; level && level.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+    console.info('[LF] 3D quality ->', quality);
+  }
+  function disable() { ok = false; }
 
   function applyTheme(key) {
     const th = T[key] || T.park; theme = th;
@@ -240,7 +256,7 @@ LF.W3 = (() => {
   function build(o) {
     if (!ok) return;
     if (level) { scene.remove(level); level.traverse(m => { if (m.geometry) m.geometry.dispose(); }); }
-    applyTheme(o.theme); const th = theme;
+    applyTheme(o.theme); const th = theme; shadowCx = null; // 새 공원이면 그림자를 다시 계산
     level = new THREE.Group(); scene.add(level); plats = []; lanterns = []; anims = [];
     const r = rng((o.seed || 7) * 131), x0 = (o.x0 != null ? o.x0 : -1500) / K, x1 = (o.len + 2600) / K;
     const gaps = (o.gaps || []).map(g => [g.x0 / K, g.x1 / K]).sort((a, b) => a[0] - b[0]);
@@ -342,7 +358,7 @@ LF.W3 = (() => {
   function syncPlats() { for (const { p, m } of plats) m.position.set((p.x + p.w / 2) / K, (LF.GY - p.y) / K - .13, 0); }
 
   // 매 프레임: camPx = 화면 왼쪽 끝의 월드 x(px), groundY = 바닥선의 화면 y
-  let curFov = FOV;
+  let curFov = FOV, shadowCx = null;
   function frame(camPx, groundY = LF.GY, dt = 0, fov = FOV) {
     if (!ok || !level) return;
     t += dt;
@@ -352,11 +368,16 @@ LF.W3 = (() => {
     const dist = (LF.H / 2) / (K * Math.tan(curFov / 2 * Math.PI / 180));
     const cx = (camPx + LF.W / 2) / K, cy = (groundY - LF.H / 2) / K;
     cam.position.set(cx, cy, dist); cam.lookAt(cx, cy, 0);
-    sun.position.set(cx - 8, 14, 10); sun.target.position.set(cx + 2, 0, -3); sun.target.updateMatrixWorld();
+    // 그림자: PC는 매 프레임 계산. 모바일은 해가 한 자리에 머물고(그림자도 월드에 고정) 화면이 5유닛 넘게 움직였을 때만 다시 계산한다
+    // (그림자 계산이 모바일 GPU에서 가장 무거워서 — 룩은 그대로 두고 비용만 줄인다)
+    if (!LF.mobile || !R.shadowMap.enabled || shadowCx == null || Math.abs(cx - shadowCx) > 5) {
+      sun.position.set(cx - 8, 14, 10); sun.target.position.set(cx + 2, 0, -3); sun.target.updateMatrixWorld();
+      shadowCx = cx; if (LF.mobile) R.shadowMap.needsUpdate = true;
+    }
     sky.position.set(cx, 0, 0);
     syncPlats();
     for (const f of anims) f(t);
     R.render(scene, cam);
   }
-  return { init, resize, build, frame, get ok() { return ok; }, K, themes: T };
+  return { init, resize, build, frame, lowerQuality, disable, get quality() { return quality; }, get ok() { return ok; }, K, themes: T };
 })();

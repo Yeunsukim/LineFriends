@@ -94,6 +94,9 @@ LF.audio = (() => {
   };
   return {
     init, applyVol, voice,
+    // 앱이 백그라운드로 가면 소리를 멈추고(배터리·소음), 돌아오면 이어서 재생
+    suspend() { if (ac && ac.state === 'running') ac.suspend().catch(() => { }); },
+    resumeCtx() { if (ac && ac.state !== 'running') ac.resume().catch(() => { }); },
     preload() { if (ac && LF.VOICE) for (const k in LF.VOICE) loadVoice(k); },
     sfx(name) { if (!ac) return; try { FX[name] && FX[name](); } catch (e) { } },
     music(name) { init(); if (name === song) return; song = name; step = 0; if (ac) nextT = ac.currentTime + .1; },
